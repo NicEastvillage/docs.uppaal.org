@@ -124,54 +124,51 @@ Declares a strategy called `shield` to enforce the desired invaraint `water_leve
 TATL queries are available in the UPPAAL TATL version only.
 {{% /notice %}}
 
-{{% notice info %}}
-Due to some yet-to-be resolved parsing conflicts, TATL sub-expressions are wrapped in parenthesis if they themselves are also valid TATL expressions.
-{{% /notice %}}
-
 ```EBNF
 TatlExpression ::=
-      Identifier '@' TatlExpressionOrExpression                             // (A)
+      Expression
+    | ('!' | 'not') TatlExpression
+    | TatlExpression '&&' TatlExpression
+    | TatlExpression '||' TatlExpression
+    | Identifier '@' TatlExpression                                  // (A)
     | TatlCoalition TatlPathProp
     ;
 
 TatlCoalition ::=
-      '<<' PlayerColorList '>>'                                             // (B1)
-    | '[[' PlayerColorList ']]'                                             // (B2)
+      '<<' PlayerColorList '>>'                                      // (B1)
+    | '[[' PlayerColorList ']]'                                      // (B2)
     ;
 
 TatlPathProp ::=
-      '[' TatlExpressionOrExpression 'U' TatlExpressionOrExpression ']'     // (C1)
-    | '<>' TatlExpressionOrExpression                                       // (C2)
-    | '[]' TatlExpressionOrExpression                                       // (C3)
-    | 'X' TatlExpressionOrExpression                                        // (C4)
-    ;
-
-TatlExpressionOrExpression ::=
-      '(' TatlExpression ')'
-    | '(' TatlExpression ')' BoolOrKWAnd TatlExpressionOrExpression
-    | '(' TatlExpression ')' BoolOrKWOr TatlExpressionOrExpression
-    | '!' '(' TatlExpression ')'
-    | Expression
+      '[' TatlExpression 'U' TatlExpression ']'                      // (C1)
+    | '<>' TatlExpression                                            // (C2)
+    | '[]' TatlExpression                                            // (C3)
+    | 'X' TatlExpression                                             // (C4)
     ;
 
 PlayerColorList ::=
       /* empty */
-    | PlayerColor
-    | PlayerColorList ',' PlayerColor
+    | PlayerColorListNonEmpty
     ;
+
+PlayerColorListNonEmpty ::=
+      PlayerColor
+    | PlayerColorListNonEmpty ',' PlayerColor
+    ;
+
 
 PlayerColor ::=
       'black' | 'lightgray' | 'darkgray' | 'red' | 'green' | 'blue' | 'yellow' | 'cyan' | 'magenta' | 'orange' | 'pink' ;
 ```
 
-Alternating-Time Temporal (ATL) logic is an extension of computation-tree logic (CTL), where the traditional for-all- and exists path quantifiers have been replaced with outcome quantifiers, quantifying over the possible outcome paths resulting from a coalition of players working together. The timed extension comes from the addition of the freeze operator.
+Alternating-Time Temporal Logic (ATL) is an extension of computation-tree logic (CTL), where the traditional for-all- and exists path quantifiers have been replaced with strategy quantifiers, quantifying over the possible outcome paths resulting from a coalition of players working together. The timed extension comes from the addition of the freeze operator.
 
-- **(A) The freeze operator.** The left-hand side must be a globally defined clock that is not used in any automata (undefined behavior otherwise). `z @ RHS` is satisfied if the right-hand side is satisfied after the clock `z` is reset in the current state.
+- **(A) The freeze operator.** The left-hand side must be a globally defined clock that is not used in any automata (undefined behavior otherwise). `z @ RHS` is holds if the right-hand side holds after the clock `z` is reset in the current state.
 - **(B) Outcome quantifiers.**
-  - `<< S >> rho` (B1) is satisfied if there *exist* strategies for the players `S` such that *all* outcome paths satisfies path property `rho`.
-  - `[[ S ]] rho` (B2) is satisfied if there *exists* an outcome path satisfying `rho` for *all* strategies the players `S`.
+  - `<< S >> rho` (B1) is satisfied if there *exist* strategies for the players `S` such that *all* outcome paths satisfies path property `rho`. Can be read as "`S` can guarantee `rho`".
+  - `[[ S ]] rho` (B2) is satisfied if under *all* strategies the players `S` there *exists* an outcome path satisfying `rho`. Can be read as "`S` cannot prevent `rho`".
   - Empty clauses: `<< >>` is equivalent to `A`, and `[[ ]]` is equivalent to `E`.
-- **(C) Path Properties.** Your typical CTL temporal operators. Note that `X` is the next *location* operator.
+- **(C) Path Properties.** The typical temporal operators from CTL. Note that `X` is the next *location* operator.
 
 #### Players
 
@@ -187,11 +184,11 @@ If a synchronization involves more than one player, it is consider "uncontrollab
 `<< green >> [] safe`
 : satisfied if there exists a strategy for `green` such that only `safe` states are visited (despite the actions of other players).
 
-`[[ red ]] [ safe U goal ]`
-: satisfied if the system *can* stay in `safe` states until eventually reaching a `goal` state despite the actions of player `red`.
+`[[ red ]] [ safe U safe && goal ]`
+: satisfied if the system *can* stay in `safe` states until eventually reaching a safe `goal` state despite the actions of player `red`.
 
 `<<>> [] (<<red, blue>> <> goal)`
 : satisfied if in all reachable states `red` and `blue` can cooperate such that `goal` is eventually reached.
 
-`z @ (<< green, blue >> [ (safe && z <= 5) U goal ])`
-: satisfied if `green` and `blue` can cooperate to reach a `goal` state within 5 time units and only visiting `safe` states along the way (`z` is a global clock).
+`z @ (<< green, blue >> [ (safe && z <= 5) U (safe && goal) ])`
+: satisfied if `green` and `blue` can cooperate to reach a safe `goal` state within 5 time units and only visiting `safe` states along the way (`z` is a global clock).
